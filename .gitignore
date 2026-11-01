@@ -1,0 +1,12 @@
+build/
+.dart_tool/
+android/
+windows/
+ios/
+linux/
+macos/
+web/
+.flutter-plugins*
+pubspec.lock
+analyze.txt
+build.txt

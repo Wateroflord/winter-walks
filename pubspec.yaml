@@ -1,0 +1,38 @@
+name: winter_walks
+description: Winter Walks — приложение семейства Winter Hub.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  path_provider: ^2.1.4
+  http: ^1.2.2
+  url_launcher: ^6.3.0
+  flutter_map: '>=7.0.2 <9.0.0'
+  latlong2: ^0.9.1
+  geolocator: ^13.0.1
+  xml: ^6.5.0
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#0A1020"
+  adaptive_icon_foreground: "assets/icon/icon_fg.png"
+  min_sdk_android: 21
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 256

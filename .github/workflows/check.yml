@@ -94,7 +94,7 @@ jobs:
           Click 0.4 (290 / $h)
           Start-Sleep 8
           Shot "4-place"
-          Get-Content "$dir\walks.json" -ErrorAction SilentlyContinue | Out-File -Append out\status.txt
+          Get-ChildItem $env:APPDATA, $env:LOCALAPPDATA -Recurse -Include walks.json,log.txt -ErrorAction SilentlyContinue | ForEach-Object { "== $($_.FullName)" | Out-File -Append out\status.txt; Get-Content $_.FullName | Out-File -Append out\status.txt }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Save

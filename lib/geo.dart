@@ -61,15 +61,15 @@ class Spot {
 /// Определить местоположение: GPS/Windows, а если не вышло — примерно по интернет-адресу.
 Future<(LatLng?, String?)> locateMe() async {
   try {
-    if (!await Geolocator.isLocationServiceEnabled()) throw Exception('off');
-    var p = await Geolocator.checkPermission();
+    if (!await Geolocator.isLocationServiceEnabled().timeout(const Duration(seconds: 8))) throw Exception('off');
+    var p = await Geolocator.checkPermission().timeout(const Duration(seconds: 8));
     if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
     if (p == LocationPermission.denied || p == LocationPermission.deniedForever) throw Exception('denied');
-    final pos = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 15)));
+    final pos = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 15))).timeout(const Duration(seconds: 20));
     return (LatLng(pos.latitude, pos.longitude), null);
   } catch (e) {
     try {
-      final last = await Geolocator.getLastKnownPosition();
+      final last = await Geolocator.getLastKnownPosition().timeout(const Duration(seconds: 5));
       if (last != null) return (LatLng(last.latitude, last.longitude), null);
     } catch (_) {}
     // Примерно по IP (город).

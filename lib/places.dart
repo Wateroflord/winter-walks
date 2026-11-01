@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -69,81 +70,96 @@ String? _classify(Map<String, String> t) {
   return null;
 }
 
-const _overpass = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+const _overpass = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
+
+/// Спрашиваем все зеркала сразу и берём первый успешный ответ.
+Future<List> _overpassQuery(String q) {
+  final done = Completer<List>();
+  var failed = 0;
+  final errors = <String>[];
+  for (final url in _overpass) {
+    http.post(Uri.parse(url), headers: {'User-Agent': userAgent}, body: {'data': q}).timeout(const Duration(seconds: 40)).then((res) {
+      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}';
+      final m = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
+      final remark = '${m['remark'] ?? ''}';
+      if (remark.contains('timed out') || remark.contains('out of memory')) throw remark;
+      if (!done.isCompleted) done.complete((m['elements'] as List?) ?? const []);
+    }).catchError((Object e) {
+      errors.add('$e');
+      if (++failed == _overpass.length && !done.isCompleted) done.completeError(Exception('Сервер карты не отвечает (${errors.first})'));
+    });
+  }
+  return done.future;
+}
 
 /// Места из OpenStreetMap в радиусе [radiusM].
 Future<List<Place>> fetchOsm(LatLng c, double radiusM) async {
   final r = radiusM.round();
   final a = 'around:$r,${c.latitude},${c.longitude}';
-  // На большом радиусе берём только заметные места (с названием и статьёй/описанием), чтобы ответ был быстрым.
+  // На большом радиусе берём только заметные места (со статьёй в Википедии/Викиданных), чтобы ответ был быстрым.
   final big = radiusM > 8000;
-  final named = big ? '[name][~"^(wikipedia|wikidata)\$"~"."]' : '[name]';
-  final q = '''
-[out:json][timeout:40];
+  final named = big ? '[name][wikidata]' : '[name]';
+  final small = big ? '[wikidata]' : '';
+  final q = """
+[out:json][timeout:35];
 (
   nwr($a)[leisure~"^(park|garden|nature_reserve)\$"]$named;
   nwr($a)[boundary~"^(protected_area|national_park)\$"]$named;
-  nwr($a)[tourism=viewpoint];
-  nwr($a)[tourism~"^(attraction|artwork|museum)\$"]$named;
-  nwr($a)[historic~"^(castle|monument|memorial|ruins|fort|manor|city_gate|archaeological_site|church|monastery|tower)\$"]$named;
-  nwr($a)[natural~"^(waterfall|peak|beach|cliff|cave_entrance|rock)\$"][name];
-  nwr($a)[waterway=waterfall];
-  nwr($a)[leisure=promenade];
+  nwr($a)[tourism=viewpoint]$small;
+  nwr($a)[tourism~"^(attraction|museum)\$"]$named;
+  nwr($a)[tourism=artwork][artwork_type!=plaque]$named;
+  nwr($a)[historic~"^(castle|monument|ruins|fort|manor|city_gate|archaeological_site|church|monastery|tower)\$"]$named;
+  nwr($a)[historic=memorial][memorial~"^(statue|war_memorial|sculpture)\$"]$named;
+  nwr($a)[natural~"^(waterfall|peak|beach|cliff|cave_entrance|rock)\$"]$named;
+  nwr($a)[waterway=waterfall]$small;
+  nwr($a)[leisure=promenade]$small;
   nwr($a)[man_made~"^(lighthouse|tower)\$"][tourism];
   ${big ? '' : 'way($a)[highway=pedestrian][name];'}
 );
-out center tags qt 500;
-''';
-  Object? lastErr;
-  for (final url in _overpass) {
-    try {
-      final res = await http.post(Uri.parse(url), headers: {'User-Agent': userAgent}, body: {'data': q}).timeout(const Duration(seconds: 45));
-      if (res.statusCode != 200) {
-        lastErr = 'HTTP ${res.statusCode}';
+out center tags qt 600;
+""";
+  final els = (await _overpassQuery(q)).whereType<Map>();
+  final out = <Place>[];
+  final seenNames = <String>{};
+  for (final e in els) {
+    final tags = {for (final x in ((e['tags'] as Map?) ?? const {}).entries) '${x.key}': '${x.value}'};
+    final lat = (e['lat'] ?? (e['center'] as Map?)?['lat']) as num?;
+    final lon = (e['lon'] ?? (e['center'] as Map?)?['lon']) as num?;
+    if (lat == null || lon == null) continue;
+    final cat = _classify(tags);
+    if (cat == null) continue;
+    var name = tags['name:ru'] ?? tags['name'] ?? '';
+    if (name.isEmpty) {
+      if (cat == 'viewpoint') {
+        name = 'Смотровая точка';
+      } else if (cat == 'waterfall') {
+        name = 'Водопад';
+      } else {
         continue;
       }
-      final els = ((jsonDecode(utf8.decode(res.bodyBytes)) as Map)['elements'] as List? ?? const []).whereType<Map>();
-      final out = <Place>[];
-      final seenNames = <String>{};
-      for (final e in els) {
-        final tags = {for (final x in ((e['tags'] as Map?) ?? const {}).entries) '${x.key}': '${x.value}'};
-        final lat = (e['lat'] ?? (e['center'] as Map?)?['lat']) as num?;
-        final lon = (e['lon'] ?? (e['center'] as Map?)?['lon']) as num?;
-        if (lat == null || lon == null) continue;
-        final cat = _classify(tags);
-        if (cat == null) continue;
-        var name = tags['name:ru'] ?? tags['name'] ?? '';
-        if (name.isEmpty) {
-          if (cat == 'viewpoint') {
-            name = 'Смотровая точка';
-          } else if (cat == 'waterfall') {
-            name = 'Водопад';
-          } else {
-            continue;
-          }
-        }
-        final p = Place('osm_${e['type']}_${e['id']}', name, LatLng(lat.toDouble(), lon.toDouble()), cat, tags);
-        // Убираем дубли (парк как участок и как точка).
-        final key = '${name.toLowerCase()}_${cat}_${(p.pos.latitude * 200).round()}_${(p.pos.longitude * 200).round()}';
-        if (!seenNames.add(key)) continue;
-        if (tags['image'] != null && tags['image']!.startsWith('http')) p.image = tags['image'];
-        final commons = tags['wikimedia_commons'];
-        if (p.image == null && commons != null && commons.startsWith('File:')) p.image = commonsThumb(commons.substring(5));
-        final wp = tags['wikipedia'];
-        if (wp != null && wp.contains(':')) {
-          final i = wp.indexOf(':');
-          p.wiki = 'https://${wp.substring(0, i)}.wikipedia.org/wiki/${Uri.encodeComponent(wp.substring(i + 1).replaceAll(' ', '_'))}';
-        }
-        p.about = tags['description:ru'] ?? tags['description'];
-        p.score = (tags['wikipedia'] != null ? 3 : 0) + (tags['wikidata'] != null ? 2 : 0) + (p.image != null ? 2 : 0) + (tags['tourism'] == 'attraction' ? 2 : 0) + (cat == 'viewpoint' ? 2 : 0);
-        out.add(p);
-      }
-      return out;
-    } catch (e) {
-      lastErr = e;
     }
+    final p = Place('osm_${e['type']}_${e['id']}', name, LatLng(lat.toDouble(), lon.toDouble()), cat, tags);
+    // Убираем дубли (парк как участок и как точка).
+    final key = '${name.toLowerCase()}_${cat}_${(p.pos.latitude * 200).round()}_${(p.pos.longitude * 200).round()}';
+    if (!seenNames.add(key)) continue;
+    if (tags['image'] != null && tags['image']!.startsWith('http')) p.image = tags['image'];
+    final commons = tags['wikimedia_commons'];
+    if (p.image == null && commons != null && commons.startsWith('File:')) p.image = commonsThumb(commons.substring(5));
+    final wp = tags['wikipedia'];
+    if (wp != null && wp.contains(':')) {
+      final i = wp.indexOf(':');
+      p.wiki = 'https://${wp.substring(0, i)}.wikipedia.org/wiki/${Uri.encodeComponent(wp.substring(i + 1).replaceAll(' ', '_'))}';
+    }
+    p.about = tags['description:ru'] ?? tags['description'];
+    p.score = (tags['wikipedia'] != null ? 3 : 0) + (tags['wikidata'] != null ? 2 : 0) + (p.image != null ? 2 : 0) + (tags['tourism'] == 'attraction' ? 2 : 0) + (cat == 'viewpoint' ? 2 : 0) + (cat == 'park' || cat == 'nature' ? 1 : 0);
+    out.add(p);
   }
-  throw Exception('Сервер карты не отвечает ($lastErr)');
+  return out;
 }
 
 String commonsThumb(String file, {int width = 500}) =>
@@ -177,6 +193,9 @@ Future<void> fillWikidataImages(List<Place> places) async {
 /// Интересные места с фото из Википедии (радиус до 10 км).
 Future<List<Place>> fetchWiki(LatLng c, double radiusM, {String lang = 'ru'}) async {
   final out = <Place>[];
+  final seen = <String>{};
+  // Типы координат, которые означают «целая страна/город/событие», а не место для прогулки.
+  const badTypes = {'country', 'satellite', 'adm1st', 'adm2nd', 'adm3rd', 'city', 'event', 'railwaystation', 'airport', 'edu'};
   for (final l in {lang, 'en'}) {
     try {
       final r = await http.get(
@@ -185,8 +204,10 @@ Future<List<Place>> fetchWiki(LatLng c, double radiusM, {String lang = 'ru'}) as
           'generator': 'geosearch',
           'ggscoord': '${c.latitude}|${c.longitude}',
           'ggsradius': '${radiusM.clamp(100, 10000).round()}',
-          'ggslimit': '80',
-          'prop': 'pageimages|coordinates|description',
+          'ggslimit': '100',
+          'prop': 'pageimages|coordinates|description|pageprops',
+          'coprop': 'type',
+          'ppprop': 'wikibase_item',
           'piprop': 'thumbnail',
           'pithumbsize': '500',
           'format': 'json',
@@ -198,12 +219,16 @@ Future<List<Place>> fetchWiki(LatLng c, double radiusM, {String lang = 'ru'}) as
         final thumb = (pg['thumbnail'] as Map?)?['source'] as String?;
         final co = (pg['coordinates'] as List?)?.firstOrNull as Map?;
         if (thumb == null || co == null) continue; // нужны именно места с фото
+        if (badTypes.contains('${co['type'] ?? ''}'.toLowerCase())) continue;
+        final qid = '${(pg['pageprops'] as Map?)?['wikibase_item'] ?? ''}';
         final title = '${pg['title']}';
         final desc = '${pg['description'] ?? ''}'.toLowerCase();
-        // Пропускаем станции, улицы, учреждения и т.п.
-        if (RegExp(r'станци|улица|проспект|школ|больниц|компани|район|микрорайон|station|street|school|company|district|village|село|деревня').hasMatch('$desc ${title.toLowerCase()}')) continue;
+        // Пропускаем станции, улицы, учреждения, события и т.п.
+        if (RegExp(r'станци|улица|проспект|школ|больниц|компани|район|микрорайон|воеводств|губерни|государств|сражени|битва|восстани|оборона|гетто|станция|посольств|магазин|отел|гостиниц|station|street|school|company|district|village|село|деревня|battle|uprising|\bstate\b|voivodeship|governorate|embassy|hotel|ghetto')
+            .hasMatch('$desc ${title.toLowerCase()}')) continue;
+        if (qid.isNotEmpty && !seen.add(qid)) continue;
         if (out.any((p) => p.name == title)) continue;
-        out.add(Place('wiki_${l}_${pg['pageid']}', title, LatLng((co['lat'] as num).toDouble(), (co['lon'] as num).toDouble()), 'wiki', const {},
+        out.add(Place('wiki_${l}_${pg['pageid']}', title, LatLng((co['lat'] as num).toDouble(), (co['lon'] as num).toDouble()), 'wiki', {if (qid.isNotEmpty) 'wikidata': qid},
             image: thumb, wiki: 'https://$l.wikipedia.org/wiki/${Uri.encodeComponent(title.replaceAll(' ', '_'))}', about: pg['description'] as String?)
           ..score = 3);
       }
@@ -214,25 +239,43 @@ Future<List<Place>> fetchWiki(LatLng c, double radiusM, {String lang = 'ru'}) as
 }
 
 /// Все места вокруг точки, отсортированные по расстоянию.
-Future<List<Place>> fetchAll(LatLng c, double radiusM, {String lang = 'ru'}) async {
-  final results = await Future.wait([
-    fetchOsm(c, radiusM).then<List<Place>?>((v) => v).catchError((_) => null),
-    fetchWiki(c, radiusM, lang: lang).catchError((_) => <Place>[]),
-  ]);
-  final osm = results[0];
-  final wiki = results[1] ?? const <Place>[];
-  if (osm == null && wiki.isEmpty) throw Exception('Нет связи с картой. Проверь интернет.');
+/// [onPartial] получает быстрые результаты из Википедии, пока карта ещё грузится.
+Future<List<Place>> fetchAll(LatLng c, double radiusM, {String lang = 'ru', void Function(List<Place>)? onPartial}) async {
+  List<Place> finish(List<Place> all) {
+    for (final p in all) {
+      p.dist = distanceM(c, p.pos);
+    }
+    all.removeWhere((p) => p.dist > radiusM * 1.05);
+    // Не больше 300 мест: самые интересные, потом по расстоянию.
+    if (all.length > 300) {
+      all.sort((a, b) => b.score != a.score ? b.score.compareTo(a.score) : a.dist.compareTo(b.dist));
+      all.removeRange(300, all.length);
+    }
+    all.sort((a, b) => a.dist.compareTo(b.dist));
+    return all;
+  }
+
+  var osmDone = false;
+  final wikiF = fetchWiki(c, radiusM, lang: lang).catchError((_) => <Place>[]);
+  wikiF.then((w) {
+    if (!osmDone && w.isNotEmpty) onPartial?.call(finish([...w]));
+  });
+  Object? osmErr;
+  final osm = await fetchOsm(c, radiusM).then<List<Place>?>((v) => v).catchError((Object e) {
+    osmErr = e;
+    return null;
+  });
+  osmDone = true;
+  final wiki = await wikiF;
+  if (osm == null && wiki.isEmpty) throw Exception('Нет связи с картой. Проверь интернет. (${'$osmErr'.replaceFirst('Exception: ', '')})');
   final all = <Place>[...?osm];
   await fillWikidataImages(all);
   // Статьи Википедии, которых нет среди мест карты.
+  final qids = {for (final p in all) if (p.tags['wikidata'] != null) p.tags['wikidata']!};
   for (final w in wiki) {
+    if (w.tags['wikidata'] != null && qids.contains(w.tags['wikidata'])) continue;
     final dup = all.any((p) => distanceM(p.pos, w.pos) < 150 && (p.name.toLowerCase() == w.name.toLowerCase() || p.wiki == w.wiki));
     if (!dup) all.add(w);
   }
-  for (final p in all) {
-    p.dist = distanceM(c, p.pos);
-  }
-  all.removeWhere((p) => p.dist > radiusM * 1.05);
-  all.sort((a, b) => a.dist.compareTo(b.dist));
-  return all;
+  return finish(all);
 }

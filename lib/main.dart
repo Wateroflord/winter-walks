@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -12,8 +13,23 @@ import 'places.dart';
 import 'ui.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const WalksApp());
+  runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (d) {
+      FlutterError.presentError(d);
+      log('flutter: ${d.exceptionAsString()}');
+    };
+    runApp(const WalksApp());
+  }, (e, st) => log('error: $e\n$st'));
+}
+
+/// Журнал ошибок в папке приложения (log.txt) — помогает разобраться, если что-то не работает.
+Future<void> log(String s) async {
+  try {
+    final f = File('${(await dataDir()).path}${Platform.pathSeparator}log.txt');
+    if (await f.exists() && await f.length() > 200000) await f.delete();
+    await f.writeAsString('${DateTime.now().toIso8601String()} $s\n', mode: FileMode.append, flush: true);
+  } catch (_) {}
 }
 
 const _sky = Color(0xFF6EC8FF);
@@ -37,7 +53,20 @@ class AppState extends ChangeNotifier {
   String? note;
 
   Future<void> load() async {
+    try {
+      await _load();
+    } catch (e, st) {
+      log('load: $e\n$st');
+      note = 'Ошибка запуска: $e';
+      loadingPlaces = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _load() async {
+    log('start, data: ${(await dataDir()).path}');
     final j = await _store.read();
+    log('saved keys: ${j.keys.toList()}');
     spot = Spot.fromJson(j['spot'] as Map?);
     radiusKm = (j['radius'] as num?)?.toInt() ?? 3;
     lang = '${j['lang'] ?? 'ru'}';
@@ -69,6 +98,7 @@ class AppState extends ChangeNotifier {
     note = null;
     notifyListeners();
     final (pos, msg) = await locateMe();
+    log('locate: $pos $msg');
     note = msg;
     if (pos == null) {
       loadingPlaces = false;
@@ -110,9 +140,15 @@ class AppState extends ChangeNotifier {
     placesError = null;
     notifyListeners();
     try {
-      places = await fetchAll(s.pos, radiusKm * 1000.0, lang: lang);
+      places = await fetchAll(s.pos, radiusKm * 1000.0, lang: lang, onPartial: (part) {
+        if (spot != s) return;
+        places = part;
+        notifyListeners();
+      });
+      log('places: ${places.length}');
     } catch (e) {
       placesError = '$e'.replaceFirst('Exception: ', '');
+      log('places error: $e');
     }
     loadingPlaces = false;
     notifyListeners();
@@ -140,7 +176,9 @@ class AppState extends ChangeNotifier {
       final extra = newsScope == 'district' && s.city.isNotEmpty && place != s.city ? s.city : '';
       news = await fetchNews(place, lang: lang, cc: s.countryCode, extra: extra);
       if (news.isEmpty && extra.isNotEmpty) news = await fetchNews(place, lang: lang, cc: s.countryCode);
+      log('news "$place": ${news.length}');
     } catch (e) {
+      log('news error: $e');
       newsError = 'Не удалось загрузить новости. Проверь интернет.';
     }
     loadingNews = false;

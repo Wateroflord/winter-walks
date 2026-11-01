@@ -38,6 +38,7 @@ Future<List<NewsItem>> fetchNews(String place, {String lang = 'ru', String cc = 
     if (source.isNotEmpty && title.endsWith(' - $source')) title = title.substring(0, title.length - source.length - 3);
     final date = _parseRfc822(text('pubDate')) ?? DateTime.now();
     if (date.isBefore(since)) continue;
+    if (source.toLowerCase().contains('gismeteo')) continue;
     out.add(NewsItem(title, source, text('link'), date));
   }
   out.sort((a, b) => b.date.compareTo(a.date));

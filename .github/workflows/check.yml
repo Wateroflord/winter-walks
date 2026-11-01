@@ -1,0 +1,97 @@
+name: Check Winter Walks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  net:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Data sources
+        run: |
+          flutter pub get
+          flutter test test/net_test.dart -r expanded 2>&1 | tee net.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: net
+          path: net.txt
+
+  windows-ui:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install, open tabs, take screenshots
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+          Add-Type @"
+          using System; using System.Runtime.InteropServices;
+          public class U {
+            [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+            [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+            [DllImport("user32.dll")] public static extern void mouse_event(int f, int x, int y, int d, int e);
+            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+            public struct RECT { public int L, T, R, B; }
+          }
+          "@
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          function Shot($name) { $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $bmp.Save("out\$name.png") }
+          # Заранее выбираем место (Киев), как будто пользователь его уже указал.
+          $dir = "$env:APPDATA\com.winterhub\winter_walks"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          '{"spot":{"lat":50.4501,"lon":30.5234,"label":"Шевченковский район, Киев","city":"Киев","district":"Шевченковский район","region":"","country":"Украина","cc":"UA"},"radius":3,"lang":"ru","scope":"city","favs":[],"visited":[]}' | Out-File -Encoding utf8NoBOM "$dir\walks.json"
+          gh release download -R Wateroflord/winter-walks -p "Winter-Walks-Setup.exe" --clobber
+          $p = Start-Process ".\Winter-Walks-Setup.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -PassThru
+          $p.WaitForExit(240000) | Out-Null
+          Start-Sleep 5
+          if (-not (Get-Process winter_walks -ErrorAction SilentlyContinue)) { Start-Process "$env:LOCALAPPDATA\Programs\Winter Walks\winter_walks.exe" }
+          Start-Sleep 45
+          $proc = Get-Process winter_walks -ErrorAction SilentlyContinue | Select-Object -First 1
+          "running=$([bool]$proc)" | Out-File -Append out\status.txt
+          Shot "1-places"
+          $r = New-Object U+RECT
+          [U]::GetWindowRect($proc.MainWindowHandle, [ref]$r) | Out-Null
+          [U]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
+          "rect=$($r.L),$($r.T),$($r.R),$($r.B)" | Out-File -Append out\status.txt
+          function Click($fx, $fy) {
+            $x = [int]($r.L + ($r.R - $r.L) * $fx); $y = [int]($r.T + ($r.B - $r.T) * $fy)
+            [U]::SetCursorPos($x, $y) | Out-Null; Start-Sleep -Milliseconds 200
+            [U]::mouse_event(2, 0, 0, 0, 0); Start-Sleep -Milliseconds 80; [U]::mouse_event(4, 0, 0, 0, 0)
+          }
+          $w = $r.R - $r.L; $h = $r.B - $r.T
+          # Вкладка «Новости» (середина нижней панели).
+          Click 0.5 (1 - 45 / $h)
+          Start-Sleep 15
+          Shot "2-news"
+          # Обратно на «Куда пойти», затем переключатель «карта» (справа вверху списка).
+          Click 0.1667 (1 - 45 / $h)
+          Start-Sleep 2
+          Click (1 - 40 / $w) (175 / $h)
+          Start-Sleep 15
+          Shot "3-map"
+          # Первая карточка места.
+          Click (1 - 70 / $w) (175 / $h)
+          Start-Sleep 2
+          Click 0.4 (290 / $h)
+          Start-Sleep 8
+          Shot "4-place"
+          Get-Content "$dir\walks.json" -ErrorAction SilentlyContinue | Out-File -Append out\status.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-ui
+          path: out

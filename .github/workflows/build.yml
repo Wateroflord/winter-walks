@@ -4,6 +4,8 @@ on:
   push:
     paths-ignore:
       - 'README.md'
+      - 'test/**'
+      - '.github/workflows/check.yml'
   workflow_dispatch:
 
 permissions:

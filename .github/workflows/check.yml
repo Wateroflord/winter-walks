@@ -19,10 +19,17 @@ jobs:
         run: |
           flutter pub get
           flutter test test/net_test.dart -r expanded 2>&1 | tee net.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: net
-          path: net.txt
+      - name: Save
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "winter-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan check-net
+          git rm -rf --cached . > /dev/null
+          git add -f net.txt
+          git commit -m "check" > /dev/null
+          git push -f origin check-net
 
   windows-ui:
     runs-on: windows-latest
@@ -90,8 +97,14 @@ jobs:
           Get-Content "$dir\walks.json" -ErrorAction SilentlyContinue | Out-File -Append out\status.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
+      - name: Save
         if: always()
-        with:
-          name: windows-ui
-          path: out
+        shell: bash
+        run: |
+          git config user.name "winter-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan check-win
+          git rm -rf --cached . > /dev/null
+          git add -f out
+          git commit -m "check" > /dev/null
+          git push -f origin check-win

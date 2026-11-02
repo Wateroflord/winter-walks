@@ -1,0 +1,2 @@
+size=320x640 density=160
+running=yes

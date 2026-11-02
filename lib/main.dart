@@ -466,8 +466,8 @@ class PlaceCard extends StatelessWidget {
           if (p.image != null)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-              child: AspectRatio(
-                aspectRatio: 16 / 8,
+              child: SizedBox(
+                height: 170,
                 child: Image.network(p.image!, fit: BoxFit.cover, headers: const {'User-Agent': userAgent}, errorBuilder: (_, __, ___) => const ColoredBox(color: W.surface2)),
               ),
             ),
@@ -545,8 +545,7 @@ class PlacesMap extends StatelessWidget {
 }
 
 TileLayer darkTiles() => TileLayer(
-      urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-      subdomains: const ['a', 'b', 'c', 'd'],
+      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       userAgentPackageName: 'com.winterhub.winter_walks',
       maxZoom: 19,
     );
@@ -563,7 +562,7 @@ class MapAttribution extends StatelessWidget {
           color: Colors.white70,
           child: GestureDetector(
             onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright'), mode: LaunchMode.externalApplication),
-            child: const Text('© OpenStreetMap © CARTO', style: TextStyle(fontSize: 10, color: Colors.black87)),
+            child: const Text('© OpenStreetMap', style: TextStyle(fontSize: 10, color: Colors.black87)),
           ),
         ),
       );
@@ -599,7 +598,10 @@ class PlaceScreen extends StatelessWidget {
                   if (p.image != null)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.network(p.image!, fit: BoxFit.cover, headers: const {'User-Agent': userAgent}, errorBuilder: (_, __, ___) => const SizedBox()),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 360),
+                        child: Image.network(p.image!, fit: BoxFit.cover, width: double.infinity, headers: const {'User-Agent': userAgent}, errorBuilder: (_, __, ___) => const SizedBox()),
+                      ),
                     ),
                   const SizedBox(height: 12),
                   Text(p.name, style: W.h1),

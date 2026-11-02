@@ -253,7 +253,7 @@ Future<List<Place>> fetchWiki(LatLng c, double radiusM, {String lang = 'ru'}) as
         final title = '${pg['title']}';
         final desc = '${pg['description'] ?? ''}'.toLowerCase();
         // Пропускаем станции, улицы, учреждения, события и т.п.
-        if (RegExp(r'станци|улица|проспект|школ|больниц|компани|район|микрорайон|воеводств|губерни|государств|сражени|битва|восстани|оборона|гетто|станция|посольств|магазин|отел|гостиниц|station|street|school|company|district|village|село|деревня|battle|uprising|\bstate\b|voivodeship|governorate|embassy|hotel|ghetto')
+        if (RegExp(r'станци|улица|проспект|школ|больниц|компани|район|микрорайон|воеводств|губерни|государств|сражени|битва|восстани|оборона|гетто|станция|посольств|магазин|отел|гостиниц|station|street|school|company|district|village|село|деревня|battle|uprising|\bstate\b|voivodeship|governorate|embassy|hotel|ghetto|airport|terminal|аэропорт|терминал|вокзал|metro|метро')
             .hasMatch('$desc ${title.toLowerCase()}')) continue;
         // Статьи о городах, странах, регионах и событиях — не место для прогулки.
         if (RegExp(r'^(город|столица|страна|регион|историческ|область|посёлок|массов|убийств|city|town|capital|country|historical|region|municipality|village|province|county|massacre|\d{3,4})').hasMatch(desc)) continue;

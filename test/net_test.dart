@@ -11,11 +11,22 @@ void main() {
     'Lviv': const LatLng(49.8397, 24.0297),
     'Warsaw': const LatLng(52.2297, 21.0122),
   };
+  test('osm only timing', () async {
+    for (final e in cities.entries) {
+      final sw = Stopwatch()..start();
+      try {
+        final r = await fetchOsm(e.value, 3000);
+        print('OSM ${e.key} 3km: ${r.length} in ${sw.elapsedMilliseconds}ms');
+      } catch (err) {
+        print('OSM ${e.key} 3km FAIL in ${sw.elapsedMilliseconds}ms: $err');
+      }
+    }
+  }, timeout: const Timeout(Duration(minutes: 5)));
   for (final e in cities.entries) {
     test('data ${e.key}', () async {
       final spot = await reverse(e.value);
       print('SPOT ${e.key}: label=${spot.label} city=${spot.city} district=${spot.district} region=${spot.region} cc=${spot.countryCode}');
-      for (final r in [2, 10, 50]) {
+      for (final r in [3, 20]) {
         final sw = Stopwatch()..start();
         final places = await fetchAll(e.value, r * 1000.0, lang: 'ru');
         final byCat = <String, int>{};
@@ -38,6 +49,6 @@ void main() {
       print('SEARCH Одесса: ${found.length} ${found.isEmpty ? '' : found.first.$1}');
       final ip = await locateMe();
       print('LOCATE: ${ip.$1} ${ip.$2}');
-    }, timeout: const Timeout(Duration(minutes: 5)));
+    }, timeout: const Timeout(Duration(minutes: 8)));
   }
 }

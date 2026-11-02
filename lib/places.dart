@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -83,15 +84,15 @@ Future<List> _overpassQuery(String q) {
   var failed = 0;
   final errors = <String>[];
   for (final url in _overpass) {
-    http.post(Uri.parse(url), headers: {'User-Agent': userAgent}, body: {'data': q}).timeout(const Duration(seconds: 40)).then((res) {
+    http.post(Uri.parse(url), headers: {'User-Agent': userAgent}, body: {'data': q}).timeout(const Duration(seconds: 35)).then((res) {
       if (res.statusCode != 200) throw 'HTTP ${res.statusCode}';
       final m = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
       final remark = '${m['remark'] ?? ''}';
       if (remark.contains('timed out') || remark.contains('out of memory')) throw remark;
       if (!done.isCompleted) done.complete((m['elements'] as List?) ?? const []);
     }).catchError((Object e) {
-      errors.add('$e');
-      if (++failed == _overpass.length && !done.isCompleted) done.completeError(Exception('Сервер карты не отвечает (${errors.first})'));
+      errors.add('${Uri.parse(url).host}: $e');
+      if (++failed == _overpass.length && !done.isCompleted) done.completeError(Exception('Сервер карты не отвечает (${errors.join('; ')})'));
     });
   }
   return done.future;
@@ -99,29 +100,31 @@ Future<List> _overpassQuery(String q) {
 
 /// Места из OpenStreetMap в радиусе [radiusM].
 Future<List<Place>> fetchOsm(LatLng c, double radiusM) async {
-  final r = radiusM.round();
-  final a = 'around:$r,${c.latitude},${c.longitude}';
+  // Квадрат вокруг точки: так сервер отвечает в разы быстрее, чем с «кругом»; лишнее отрежем по расстоянию.
+  final dLat = radiusM / 111320.0;
+  final dLon = radiusM / (111320.0 * math.cos(c.latitude * math.pi / 180)).abs().clamp(1000, 111320);
+  final bbox = '${c.latitude - dLat},${c.longitude - dLon},${c.latitude + dLat},${c.longitude + dLon}';
   // На большом радиусе берём только заметные места (со статьёй в Википедии/Викиданных), чтобы ответ был быстрым.
   final big = radiusM > 8000;
   final named = big ? '[name][wikidata]' : '[name]';
   final small = big ? '[wikidata]' : '';
   final q = """
-[out:json][timeout:35];
+[out:json][timeout:30][bbox:$bbox];
 (
-  nwr($a)[leisure~"^(park|garden|nature_reserve)\$"]$named;
-  nwr($a)[boundary~"^(protected_area|national_park)\$"]$named;
-  nwr($a)[tourism=viewpoint]$small;
-  nwr($a)[tourism~"^(attraction|museum)\$"]$named;
-  nwr($a)[tourism=artwork][artwork_type!=plaque]$named;
-  nwr($a)[historic~"^(castle|monument|ruins|fort|manor|city_gate|archaeological_site|church|monastery|tower)\$"]$named;
-  nwr($a)[historic=memorial][memorial~"^(statue|war_memorial|sculpture)\$"]$named;
-  nwr($a)[natural~"^(waterfall|peak|beach|cliff|cave_entrance|rock)\$"]$named;
-  nwr($a)[waterway=waterfall]$small;
-  nwr($a)[leisure=promenade]$small;
-  nwr($a)[man_made~"^(lighthouse|tower)\$"][tourism];
-  ${big ? '' : 'way($a)[highway=pedestrian][name];'}
+  nwr[leisure~"^(park|garden|nature_reserve)\$"]$named;
+  nwr[boundary~"^(protected_area|national_park)\$"]$named;
+  nw[tourism=viewpoint]$small;
+  nwr[tourism~"^(attraction|museum)\$"]$named;
+  nw[tourism=artwork][artwork_type!=plaque]$named;
+  nwr[historic~"^(castle|monument|ruins|fort|manor|city_gate|archaeological_site|church|monastery|tower)\$"]$named;
+  nw[historic=memorial][memorial~"^(statue|war_memorial|sculpture)\$"]$named;
+  nw[natural~"^(waterfall|peak|beach|cliff|cave_entrance|rock)\$"]$named;
+  nw[waterway=waterfall]$small;
+  nw[leisure=promenade]$small;
+  nw[man_made~"^(lighthouse|tower)\$"][tourism];
+  ${big ? '' : 'way[highway=pedestrian][name];'}
 );
-out center tags qt 600;
+out center tags qt 800;
 """;
   final els = (await _overpassQuery(q)).whereType<Map>();
   final out = <Place>[];
@@ -226,13 +229,16 @@ Future<List<Place>> fetchWiki(LatLng c, double radiusM, {String lang = 'ru'}) as
         // Пропускаем станции, улицы, учреждения, события и т.п.
         if (RegExp(r'станци|улица|проспект|школ|больниц|компани|район|микрорайон|воеводств|губерни|государств|сражени|битва|восстани|оборона|гетто|станция|посольств|магазин|отел|гостиниц|station|street|school|company|district|village|село|деревня|battle|uprising|\bstate\b|voivodeship|governorate|embassy|hotel|ghetto')
             .hasMatch('$desc ${title.toLowerCase()}')) continue;
+        // Статьи о городах, странах, регионах и событиях — не место для прогулки.
+        if (RegExp(r'^(город|столица|страна|регион|историческ|область|посёлок|массов|убийств|city|town|capital|country|historical|region|municipality|village|province|county|massacre|\d{3,4})').hasMatch(desc)) continue;
+        if (RegExp(r'massacre|mass murder|genocide|убийство|расстрел|резня').hasMatch(desc)) continue;
         if (qid.isNotEmpty && !seen.add(qid)) continue;
         if (out.any((p) => p.name == title)) continue;
         out.add(Place('wiki_${l}_${pg['pageid']}', title, LatLng((co['lat'] as num).toDouble(), (co['lon'] as num).toDouble()), 'wiki', {if (qid.isNotEmpty) 'wikidata': qid},
             image: thumb, wiki: 'https://$l.wikipedia.org/wiki/${Uri.encodeComponent(title.replaceAll(' ', '_'))}', about: pg['description'] as String?)
           ..score = 3);
       }
-      if (out.length >= 20) break;
+      if (out.length >= 8) break; // английскую Википедию спрашиваем, только если на своём языке мало
     } catch (_) {}
   }
   return out;

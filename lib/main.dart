@@ -133,23 +133,51 @@ class AppState extends ChangeNotifier {
     loadNews();
   }
 
+  final _cache = JsonStore('cache.json');
+  int _gen = 0;
+
+  String _cacheKey(Spot s) => '${s.pos.latitude.toStringAsFixed(3)},${s.pos.longitude.toStringAsFixed(3)},$radiusKm';
+
   Future<void> loadPlaces() async {
     final s = spot;
     if (s == null) return;
+    final gen = ++_gen;
     loadingPlaces = true;
     placesError = null;
+    // Сначала показываем то, что уже находили здесь раньше, — мгновенно и без интернета.
+    final cache = await _cache.read();
+    final key = _cacheKey(s);
+    final cached = cache[key];
+    if (cached is List && gen == _gen) {
+      places = [for (final j in cached.whereType<Map>()) Place.fromJson(j)];
+      for (final p in places) {
+        p.dist = distanceM(s.pos, p.pos);
+      }
+    } else if (gen == _gen) {
+      places = [];
+    }
     notifyListeners();
     try {
-      places = await fetchAll(s.pos, radiusKm * 1000.0, lang: lang, onPartial: (part) {
-        if (spot != s) return;
+      final fresh = await fetchAll(s.pos, radiusKm * 1000.0, lang: lang, onPartial: (part) {
+        if (gen != _gen || part.length <= places.length) return;
         places = part;
         notifyListeners();
       });
-      log('places: ${places.length}');
+      if (gen != _gen) return;
+      if (fresh.length >= places.length || cached is! List) places = fresh;
+      log('places: ${fresh.length}');
+      final keep = Map<String, dynamic>.from(cache)..remove(key);
+      while (keep.length >= 6) {
+        keep.remove(keep.keys.first);
+      }
+      keep[key] = [for (final p in places) p.toJson()];
+      await _cache.write(keep);
     } catch (e) {
-      placesError = '$e'.replaceFirst('Exception: ', '');
+      if (gen != _gen) return;
       log('places error: $e');
+      if (places.isEmpty) placesError = '$e'.replaceFirst('Exception: ', '');
     }
+    if (gen != _gen) return;
     loadingPlaces = false;
     notifyListeners();
   }
@@ -175,6 +203,7 @@ class AppState extends ChangeNotifier {
       // Для района добавляем город, чтобы не путать с одноимёнными районами других городов.
       final extra = newsScope == 'district' && s.city.isNotEmpty && place != s.city ? s.city : '';
       news = await fetchNews(place, lang: lang, cc: s.countryCode, extra: extra);
+      if (news.isEmpty && extra.isEmpty) news = await fetchNews(place, lang: lang, cc: s.countryCode); // повтор: Google иногда отвечает пусто
       if (news.isEmpty && extra.isNotEmpty) news = await fetchNews(place, lang: lang, cc: s.countryCode);
       log('news "$place": ${news.length}');
     } catch (e) {

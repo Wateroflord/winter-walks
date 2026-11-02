@@ -49,9 +49,15 @@ class Place {
   Category get category => catOf(cat);
   Kind get kind => category.kind;
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'lat': pos.latitude, 'lon': pos.longitude, 'cat': cat, 'image': image, 'wiki': wiki, 'about': about};
-  static Place fromJson(Map j) => Place('${j['id']}', '${j['name']}', LatLng((j['lat'] as num).toDouble(), (j['lon'] as num).toDouble()), '${j['cat']}', const {},
-      image: j['image'] as String?, wiki: j['wiki'] as String?, about: j['about'] as String?);
+  static const _keepTags = ['opening_hours', 'fee', 'wheelchair', 'ele', 'website', 'wikidata'];
+  Map<String, dynamic> toJson() => {
+        'id': id, 'name': name, 'lat': pos.latitude, 'lon': pos.longitude, 'cat': cat, 'image': image, 'wiki': wiki, 'about': about, 'score': score,
+        'tags': {for (final k in _keepTags) if (tags[k] != null) k: tags[k]},
+      };
+  static Place fromJson(Map j) => Place('${j['id']}', '${j['name']}', LatLng((j['lat'] as num).toDouble(), (j['lon'] as num).toDouble()), '${j['cat']}',
+      {for (final e in ((j['tags'] as Map?) ?? const {}).entries) '${e.key}': '${e.value}'},
+      image: j['image'] as String?, wiki: j['wiki'] as String?, about: j['about'] as String?)
+    ..score = (j['score'] as num?)?.toInt() ?? 0;
 }
 
 String? _classify(Map<String, String> t) {
@@ -79,12 +85,12 @@ const _overpass = [
 ];
 
 /// Спрашиваем все зеркала сразу и берём первый успешный ответ.
-Future<List> _overpassQuery(String q) {
+Future<List> _overpassQuery(String q, {int seconds = 60}) {
   final done = Completer<List>();
   var failed = 0;
   final errors = <String>[];
   for (final url in _overpass) {
-    http.post(Uri.parse(url), headers: {'User-Agent': userAgent}, body: {'data': q}).timeout(const Duration(seconds: 35)).then((res) {
+    http.post(Uri.parse(url), headers: {'User-Agent': userAgent}, body: {'data': q}).timeout(Duration(seconds: seconds)).then((res) {
       if (res.statusCode != 200) throw 'HTTP ${res.statusCode}';
       final m = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
       final remark = '${m['remark'] ?? ''}';
@@ -139,7 +145,14 @@ out center tags qt 300;
 );
 out center tags qt 800;
 """;
-  final els = (await _overpassQuery(q)).whereType<Map>();
+  List raw;
+  try {
+    raw = await _overpassQuery(q, seconds: light ? 40 : 60);
+  } catch (_) {
+    if (!light) rethrow;
+    raw = await _overpassQuery(q, seconds: 40); // серверы часто перегружены — одна повторная попытка
+  }
+  final els = raw.whereType<Map>();
   final out = <Place>[];
   final seenNames = <String>{};
   for (final e in els) {

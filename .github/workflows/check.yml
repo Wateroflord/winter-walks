@@ -64,7 +64,7 @@ jobs:
           $p.WaitForExit(240000) | Out-Null
           Start-Sleep 5
           if (-not (Get-Process winter_walks -ErrorAction SilentlyContinue)) { Start-Process "$env:LOCALAPPDATA\Programs\Winter Walks\winter_walks.exe" }
-          Start-Sleep 45
+          Start-Sleep 75
           $proc = Get-Process winter_walks -ErrorAction SilentlyContinue | Select-Object -First 1
           "running=$([bool]$proc)" | Out-File -Append out\status.txt
           Shot "1-places"

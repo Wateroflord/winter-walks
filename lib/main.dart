@@ -264,8 +264,17 @@ class _HomeState extends State<Home> {
         child: ListenableBuilder(
           listenable: app,
           builder: (context, _) => Column(children: [
-            const _Header(),
-            Expanded(child: IndexedStack(index: tab, children: const [PlacesTab(), NewsTab(), FavsTab()])),
+            // Не const: шапка и вкладки должны перерисовываться, когда меняются данные.
+            // ignore: prefer_const_constructors
+            _Header(),
+            Expanded(child: IndexedStack(index: tab, children: [
+              // ignore: prefer_const_constructors
+              PlacesTab(),
+              // ignore: prefer_const_constructors
+              NewsTab(),
+              // ignore: prefer_const_constructors
+              FavsTab(),
+            ])),
           ]),
         ),
       ),
@@ -411,10 +420,25 @@ class _PlacesTabState extends State<PlacesTab> {
       Expanded(
         child: showMap
             ? PlacesMap(places: list, controller: mapCtrl)
-            : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-                itemCount: list.length,
-                itemBuilder: (_, i) => PlaceCard(list[i]),
+            : RefreshIndicator(
+                onRefresh: app.loadPlaces,
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  itemCount: list.length + 1,
+                  itemBuilder: (_, i) => i < list.length
+                      ? PlaceCard(list[i])
+                      : Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Center(
+                            child: TextButton.icon(
+                              onPressed: app.loadingPlaces ? null : app.loadPlaces,
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: Text(app.loadingPlaces ? 'Ищу ещё места…' : 'Обновить список'),
+                            ),
+                          ),
+                        ),
+                ),
               ),
       ),
     ]);

@@ -31,6 +31,42 @@ jobs:
           git commit -m "check" > /dev/null
           git push -f origin check-net
 
+  android-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Download APK
+        run: |
+          mkdir -p out
+          gh release download -R Wateroflord/winter-walks -p "Winter-Walks.apk"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash tools/android_ui.sh
+      - name: Save
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "winter-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan check-android
+          git rm -rf --cached . > /dev/null
+          git add -f out
+          git commit -m "check" > /dev/null
+          git push -f origin check-android
+
   windows-ui:
     runs-on: windows-latest
     timeout-minutes: 20

@@ -1,0 +1,9 @@
+running=True
+rect=10,10,1054,730
+== C:\Users\runneradmin\AppData\Roaming\com.winterhub\winter_walks\log.txt
+2026-11-02T20:27:03.972856 start, data: C:\Users\runneradmin\AppData\Roaming\com.winterhub\winter_walks
+2026-11-02T20:27:03.979868 saved keys: [spot, radius, lang, scope, favs, visited]
+2026-11-02T20:27:04.643974 news "Киев": 97
+2026-11-02T20:27:43.848963 places: 300
+== C:\Users\runneradmin\AppData\Roaming\com.winterhub\winter_walks\walks.json
+{"spot":{"lat":50.4501,"lon":30.5234,"label":"Шевченковский район, Киев","city":"Киев","district":"Шевченковский район","region":"","country":"Украина","cc":"UA"},"radius":3,"lang":"ru","scope":"city","favs":[],"visited":[]}

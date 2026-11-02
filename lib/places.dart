@@ -99,7 +99,7 @@ Future<List> _overpassQuery(String q) {
 }
 
 /// Места из OpenStreetMap в радиусе [radiusM].
-Future<List<Place>> fetchOsm(LatLng c, double radiusM) async {
+Future<List<Place>> fetchOsm(LatLng c, double radiusM, {bool light = false}) async {
   // Квадрат вокруг точки: так сервер отвечает в разы быстрее, чем с «кругом»; лишнее отрежем по расстоянию.
   final dLat = radiusM / 111320.0;
   final dLon = radiusM / (111320.0 * math.cos(c.latitude * math.pi / 180)).abs().clamp(1000, 111320);
@@ -108,15 +108,28 @@ Future<List<Place>> fetchOsm(LatLng c, double radiusM) async {
   final big = radiusM > 8000;
   final named = big ? '[name][wikidata]' : '[name]';
   final small = big ? '[wikidata]' : '';
-  final q = """
+  // Лёгкий запрос: только парки, природа, смотровые и главные достопримечательности — отвечает быстро даже в центре большого города.
+  final q = light
+      ? """
+[out:json][timeout:20][bbox:$bbox];
+(
+  nw[leisure~"^(park|garden|nature_reserve)\$"][name]${big ? '[wikidata]' : ''};
+  nw[tourism=viewpoint]$small;
+  nw[tourism=attraction][name][wikidata];
+  nw[historic~"^(castle|monument|fort|city_gate)\$"][name][wikidata];
+  nw[natural~"^(waterfall|peak|beach|cliff)\$"][name]$small;
+);
+out center tags qt 300;
+"""
+      : """
 [out:json][timeout:30][bbox:$bbox];
 (
   nwr[leisure~"^(park|garden|nature_reserve)\$"]$named;
-  nwr[boundary~"^(protected_area|national_park)\$"]$named;
+  ${big ? 'nwr[boundary~"^(protected_area|national_park)\$"]$named;' : ''}
   nw[tourism=viewpoint]$small;
   nwr[tourism~"^(attraction|museum)\$"]$named;
   nw[tourism=artwork][artwork_type!=plaque]$named;
-  nwr[historic~"^(castle|monument|ruins|fort|manor|city_gate|archaeological_site|church|monastery|tower)\$"]$named;
+  nw[historic~"^(castle|monument|ruins|fort|manor|city_gate|archaeological_site|church|monastery|tower)\$"]$named;
   nw[historic=memorial][memorial~"^(statue|war_memorial|sculpture)\$"]$named;
   nw[natural~"^(waterfall|peak|beach|cliff|cave_entrance|rock)\$"]$named;
   nw[waterway=waterfall]$small;
@@ -262,15 +275,28 @@ Future<List<Place>> fetchAll(LatLng c, double radiusM, {String lang = 'ru', void
   }
 
   var osmDone = false;
+  List<Place> shown = [];
+  void partial(List<Place> more) {
+    if (osmDone || more.isEmpty) return;
+    final ids = {for (final p in shown) p.id};
+    shown = finish([...shown, ...more.where((p) => !ids.contains(p.id))]);
+    onPartial?.call(shown);
+  }
+
   final wikiF = fetchWiki(c, radiusM, lang: lang).catchError((_) => <Place>[]);
-  wikiF.then((w) {
-    if (!osmDone && w.isNotEmpty) onPartial?.call(finish([...w]));
-  });
+  wikiF.then(partial);
+  // Лёгкий и полный запросы идут параллельно: лёгкий быстро показывает главное, полный дополняет.
+  final lightF = fetchOsm(c, radiusM, light: true).then<List<Place>?>((v) async {
+    await fillWikidataImages(v);
+    return v;
+  }).catchError((Object _) => null);
+  lightF.then((v) => partial(v ?? const []));
   Object? osmErr;
-  final osm = await fetchOsm(c, radiusM).then<List<Place>?>((v) => v).catchError((Object e) {
+  var osm = await fetchOsm(c, radiusM).then<List<Place>?>((v) => v).catchError((Object e) {
     osmErr = e;
     return null;
   });
+  osm ??= await lightF;
   osmDone = true;
   final wiki = await wikiF;
   if (osm == null && wiki.isEmpty) throw Exception('Нет связи с картой. Проверь интернет. (${'$osmErr'.replaceFirst('Exception: ', '')})');

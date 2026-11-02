@@ -15,6 +15,9 @@ void main() {
     for (final e in cities.entries) {
       final sw = Stopwatch()..start();
       try {
+        final l = await fetchOsm(e.value, 3000, light: true);
+        print('OSM-light ${e.key} 3km: ${l.length} in ${sw.elapsedMilliseconds}ms');
+        sw.reset();
         final r = await fetchOsm(e.value, 3000);
         print('OSM ${e.key} 3km: ${r.length} in ${sw.elapsedMilliseconds}ms');
       } catch (err) {

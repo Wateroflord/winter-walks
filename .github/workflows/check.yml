@@ -121,11 +121,11 @@ jobs:
           # Обратно на «Куда пойти», затем переключатель «карта» (справа вверху списка).
           Click 0.1667 (1 - 45 / $h)
           Start-Sleep 2
-          Click (1 - 40 / $w) (175 / $h)
+          Click (1 - 40 / $w) (212 / $h)
           Start-Sleep 15
           Shot "3-map"
           # Первая карточка места.
-          Click (1 - 70 / $w) (175 / $h)
+          Click (1 - 70 / $w) (212 / $h)
           Start-Sleep 2
           Click 0.4 (290 / $h)
           Start-Sleep 8

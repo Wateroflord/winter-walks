@@ -1,0 +1,76 @@
+00:00 +0: loading /home/runner/work/winter-walks/winter-walks/test/net_test.dart
+00:00 +0: osm only timing
+OSM-light Kyiv 3km: 116 in 36884ms
+OSM Kyiv 3km: 596 in 32884ms
+OSM-light Lviv 3km: 72 in 33921ms
+OSM Lviv 3km: 321 in 26309ms
+OSM-light Warsaw 3km: 202 in 32806ms
+OSM Warsaw 3km: 725 in 30689ms
+03:13 +1: data Kyiv
+SPOT Kyiv: label=Шевченковский район, Киев city=Киев district=Шевченковский район region= cc=UA
+PLACES Kyiv 3km: 300 in 37459ms, images=117, {historic: 22, wiki: 1, attraction: 85, art: 90, water: 25, park: 37, viewpoint: 25, nature: 11, peak: 4}
+   🏰 Знак отсчета расстояний 0 м img=false wiki=false
+   📖 Maidan Nezalezhnosti 60 м img=true wiki=true
+   📸 Лядские ворота 100 м img=true wiki=true
+   🗿 Казак Мамай 110 м img=false wiki=false
+   🗿 Swing on the hedgehog 110 м img=false wiki=false
+PLACES Kyiv 20km: 3 in 80004ms, images=3, {wiki: 3}
+   📖 Майдан Незалежности 40 м img=true wiki=true
+   📖 Европейская площадь 370 м img=true wiki=true
+   📖 Saint Sophia Cathedral, Kyiv 700 м img=true wiki=true
+NEWS Kyiv "Шевченковский район": 20
+   3 ч назад | Справжнє | Громкие звуки в Запорожье: жители одного из районов будут слышать взрывы
+   5 ч назад | OstanniPodii.com | 3–8 ноября в Киеве пройдут продуктовые ярмарки
+   5 ч назад | Справжнє | Ремонт сети на улице Иванова: как будут ездить трамваи в Запорожье 3 ноября
+NEWS Kyiv "Киев": 98
+   1 ч назад | ТСН | Содержание бойцов, протесты и приезд командующего НГУ: главное о событиях в Петропавловской Борщаговке
+   1 ч назад | 24 Канал | Россия терроризировала Киев и область, пострадал подросток: каковы последствия обстрела региона
+   4 ч назад | ТСН | В Киеве отменили экстренные отключения света: какие графики будут действовать теперь
+SEARCH Одесса: 3 Одесса, Одеська міська громада, Одесский район, Одесская область, Украина
+LOCATE: LatLng(latitude:29.42412, longitude:-98.493634) Определил примерно по интернету. Можно уточнить на карте.
+05:12 +2: data Lviv
+SPOT Lviv: label=Галицький район, Львов city=Львов district=Галицький район region=Львовская область cc=UA
+PLACES Lviv 3km: 72 in 60102ms, images=32, {wiki: 7, viewpoint: 18, park: 14, historic: 8, attraction: 5, nature: 10, peak: 9, garden: 1}
+   📖 Памятник Адаму Мицкевичу (Львов) 40 м img=true wiki=true
+   🔭 Смотровая на Крыше 260 м img=false wiki=false
+   🔭 Оглядовий майданчик на Ратуші 270 м img=false wiki=false
+   🌳 Євгена Маланюка 280 м img=false wiki=false
+   🏰 Дворец Потоцких 280 м img=true wiki=true
+PLACES Lviv 20km: 48 in 60092ms, images=43, {wiki: 7, historic: 14, park: 6, attraction: 6, nature: 8, peak: 7}
+   📖 Памятник Адаму Мицкевичу (Львов) 40 м img=true wiki=true
+   🏰 Дворец Потоцких 280 м img=true wiki=true
+   🌳 Бернарденгарден 330 м img=true wiki=true
+   📸 Палац Любомирських 350 м img=true wiki=true
+   📖 Костёл и монастырь бернардинцев (Львов) 360 м img=true wiki=true
+NEWS Lviv "Галицький район": 0
+NEWS Lviv "Львов": 98
+   2 ч назад | UA-Football | УПЛ. Безжалостный разгром во Львове. Карпаты уничтожили Кудровку во втором тайме
+   5 ч назад | AgroPortal.ua | Профессиональный дегустационный конкурс Favorite Food & Drinks пройдет во Львове
+   6 ч назад | NV | Художественная рефлексия о войне. Во Львове покажут танцевальный спектакль Поле. Утренняя леди
+NEWS Lviv "Львовская область": 28
+   5 ч назад | Головне в Україні | Во Львовской области выявили производство подделок мировых брендов почти на 100 млн грн
+   5 ч назад | УНИАН | В Украине представили еще один туристический маршрут для ветеранов
+   5 ч назад | RegioNews.ua | Во Львовской области будут судить восемь человек за подделки мировых брендов на почти 98 млн грн
+SEARCH Одесса: 3 Одесса, Одеська міська громада, Одесский район, Одесская область, Украина
+LOCATE: LatLng(latitude:29.42412, longitude:-98.493634) Определил примерно по интернету. Можно уточнить на карте.
+07:14 +3: data Warsaw
+SPOT Warsaw: label=Средместье, Варшава city=Варшава district=Средместье region=Мазовецкое воеводство cc=PL
+PLACES Warsaw 3km: 187 in 76517ms, images=92, {park: 80, wiki: 3, viewpoint: 20, historic: 47, garden: 11, attraction: 13, peak: 7, art: 3, beach: 2, water: 1}
+   🌳 Skwer Batalionu AK "Zaremba-Piorun" 360 м img=false wiki=false
+   📖 Palace of Culture and Science 450 м img=true wiki=true
+   🔭 Pałac Kultury i Nauki 470 м img=false wiki=false
+   📖 Warsaw Department 510 м img=true wiki=true
+   🌳 Park Świętokrzyski 640 м img=true wiki=true
+PLACES Warsaw 20km: 3 in 80003ms, images=3, {wiki: 3}
+   📖 Palace of Culture and Science 450 м img=true wiki=true
+   📖 Warsaw Department 510 м img=true wiki=true
+   📖 National Bank of Poland 760 м img=true wiki=true
+NEWS Warsaw "Средместье": 0
+NEWS Warsaw "Варшава": 100
+   14 мин назад | NEWS.ru | Варшава усиливает полицию на границе с Россией
+   2 ч назад | ZIMA Magazine | Софи Марсо, отпетая Варшавянка
+   7 ч назад | Газета | В Польше опровергли слухи о попытках помешать борту президента сесть в Варшаве
+NEWS Warsaw "Мазовецкое воеводство": 0
+SEARCH Одесса: 3 Одесса, Одеська міська громада, Одесский район, Одесская область, Украина
+LOCATE: LatLng(latitude:29.42412, longitude:-98.493634) Определил примерно по интернету. Можно уточнить на карте.
+09:52 +4: All tests passed!

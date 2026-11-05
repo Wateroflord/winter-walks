@@ -18,7 +18,7 @@ jobs:
       - name: Data sources
         run: |
           flutter pub get
-          flutter test test/net_test.dart -r expanded 2>&1 | tee net.txt
+          flutter test net_test/net_test.dart -r expanded 2>&1 | tee net.txt
       - name: Save
         if: always()
         shell: bash

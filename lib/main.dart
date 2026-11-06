@@ -13,7 +13,7 @@ import 'places.dart';
 import 'ui.dart';
 import 'package:winter_core/winter_core.dart';
 
-void main() => runWinterApp(repo: 'winter-walks', appName: 'Winter Walks', body: _main);
+Future<void> main() => runWinterApp(repo: 'winter-walks', appName: 'Winter Walks', body: _main);
 
 void _main() {
   WidgetsFlutterBinding.ensureInitialized();

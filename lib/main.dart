@@ -11,16 +11,18 @@ import 'geo.dart';
 import 'news.dart';
 import 'places.dart';
 import 'ui.dart';
+import 'package:winter_core/winter_core.dart';
 
-void main() {
-  runZonedGuarded(() {
-    WidgetsFlutterBinding.ensureInitialized();
-    FlutterError.onError = (d) {
-      FlutterError.presentError(d);
-      log('flutter: ${d.exceptionAsString()}');
-    };
-    runApp(const WalksApp());
-  }, (e, st) => log('error: $e\n$st'));
+void main() => runWinterApp(repo: 'winter-walks', appName: 'Winter Walks', body: _main);
+
+void _main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  final crash = FlutterError.onError;
+  FlutterError.onError = (d) {
+    crash?.call(d); // запись в отчёт о падениях (winter_core)
+    log('flutter: ${d.exceptionAsString()}');
+  };
+  runApp(WinterCrashBanner(child: const WalksApp()));
 }
 
 /// Журнал ошибок в папке приложения (log.txt) — помогает разобраться, если что-то не работает.
